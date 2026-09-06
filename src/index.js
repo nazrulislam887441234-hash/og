@@ -26,12 +26,20 @@ export default {
       return fetch(request);
     }
 
+    // =========================================================
+    // SOCIAL CRAWLER CHECK
+    // =========================================================
+
+    if (!isSocialCrawler(request)) {
+      return fetch(request);
+    }
+
     const pathname = url.pathname;
     const searchParams = url.searchParams;
 
     try {
       // =====================================================
-      // PRODUCT
+      // PRODUCT PREVIEW
       // =====================================================
 
       const productInfo = getProductSlug(
@@ -62,17 +70,13 @@ export default {
               : html,
             {
               status: 200,
-
               headers: {
                 "Content-Type":
                   "text/html; charset=UTF-8",
-
                 "Cache-Control":
                   "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-
                 "X-Robots-Tag":
                   "index, follow",
-
                 "Vary":
                   "User-Agent",
               },
@@ -82,7 +86,7 @@ export default {
       }
 
       // =====================================================
-      // SELLER / SHOP / PROFILE
+      // SELLER / SHOP / PROFILE PREVIEW
       // =====================================================
 
       const sellerInfo =
@@ -114,17 +118,13 @@ export default {
               : html,
             {
               status: 200,
-
               headers: {
                 "Content-Type":
                   "text/html; charset=UTF-8",
-
                 "Cache-Control":
                   "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-
                 "X-Robots-Tag":
                   "index, follow",
-
                 "Vary":
                   "User-Agent",
               },
@@ -140,20 +140,26 @@ export default {
     }
 
     // =========================================================
-    // FALLBACK FOR UNMATCHED PAGES
+    // FALLBACK PASS-THROUGH
     // =========================================================
 
-    const redirectUrl =
-      MAIN_SITE +
-      url.pathname +
-      url.search;
-
-    return Response.redirect(
-      redirectUrl,
-      302
-    );
+    return fetch(request);
   },
 };
+
+
+// =============================================================
+// SOCIAL CRAWLER DETECTION
+// =============================================================
+
+function isSocialCrawler(request) {
+  const userAgent =
+    request.headers.get("user-agent") || "";
+
+  return /facebookexternalhit|Facebot|Twitterbot|Slackbot|TelegramBot|LinkedInBot|Discordbot|Pinterestbot|WhatsApp|SkypeUriPreview|Applebot|vkShare|Embedly|Quora Link Preview|outbrain|W3C_Validator/i.test(
+    userAgent
+  );
+}
 
 
 // =============================================================
@@ -186,9 +192,6 @@ function getProductSlug(
 
   // ===========================================================
   // CASE 1
-  //
-  // /product.html?slug=iphone-15
-  // /product.html?product-slug=iphone-15
   // ===========================================================
 
   let slug =
@@ -204,9 +207,6 @@ function getProductSlug(
 
   // ===========================================================
   // CASE 2
-  //
-  // /product/iphone-15
-  // /product.html/iphone-15
   // ===========================================================
 
   const parts =
@@ -235,8 +235,6 @@ function getProductSlug(
 
   // ===========================================================
   // CASE 3
-  //
-  // /product.html?iphone-15
   // ===========================================================
 
   for (const [key, value] of searchParams.entries()) {
@@ -275,6 +273,9 @@ function getProductSlug(
 
 async function getProductBySlug(slug) {
   try {
+    const FIRESTORE_BASE =
+      "https://firestore.googleapis.com/v1/projects/ghotimarket/databases/(default)/documents";
+
     const queryUrl =
       `${FIRESTORE_BASE.replace(
         "/documents",
@@ -343,6 +344,9 @@ async function getProductBySlug(slug) {
 
     const fields =
       document.fields;
+
+    const DEFAULT_PRODUCT_IMAGE =
+      "https://i.ibb.co/RG2hrf3y/background-remove-ghoti-market.png";
 
     return {
       name:
@@ -432,11 +436,6 @@ function getSellerIdentifier(
     };
   }
 
-  // ===========================================================
-  // ?sellerId=abc
-  // ?username=abc
-  // ===========================================================
-
   let identifier =
     searchParams.get(
       "sellerId"
@@ -455,12 +454,6 @@ function getSellerIdentifier(
         ),
     };
   }
-
-  // ===========================================================
-  // /seller/abc
-  // /shop/abc
-  // /profile/abc
-  // ===========================================================
 
   if (parts.length >= 2) {
     const lastPart =
@@ -482,11 +475,6 @@ function getSellerIdentifier(
       };
     }
   }
-
-  // ===========================================================
-  // ?@username
-  // ?username
-  // ===========================================================
 
   for (
     const [key, value]
@@ -549,10 +537,8 @@ async function getSeller(
   identifier
 ) {
   try {
-
-    // ---------------------------------------------------------
-    // 1. public_sellers/{identifier}
-    // ---------------------------------------------------------
+    const FIRESTORE_BASE =
+      "https://firestore.googleapis.com/v1/projects/ghotimarket/databases/(default)/documents";
 
     let response =
       await fetch(
@@ -569,10 +555,6 @@ async function getSeller(
       );
     }
 
-    // ---------------------------------------------------------
-    // 2. users/{identifier}
-    // ---------------------------------------------------------
-
     response =
       await fetch(
         `${FIRESTORE_BASE}/users/${encodeURIComponent(identifier)}`
@@ -587,10 +569,6 @@ async function getSeller(
         identifier
       );
     }
-
-    // ---------------------------------------------------------
-    // 3. username query
-    // ---------------------------------------------------------
 
     const queryUrl =
       `${FIRESTORE_BASE.replace(
@@ -684,8 +662,10 @@ function normalizeSeller(
   fields,
   identifier
 ) {
-  return {
+  const DEFAULT_SELLER_IMAGE =
+    "https://i.ibb.co/RG2hrf3y/background-remove-ghoti-market.png";
 
+  return {
     identifier,
 
     name:
@@ -758,6 +738,9 @@ function buildProductHTML(
       ),
       160
     );
+
+  const DEFAULT_PRODUCT_IMAGE =
+    "https://i.ibb.co/RG2hrf3y/background-remove-ghoti-market.png";
 
   const image =
     product.image ||
@@ -860,6 +843,9 @@ function buildSellerHTML(
       ),
       160
     );
+
+  const DEFAULT_SELLER_IMAGE =
+    "https://i.ibb.co/RG2hrf3y/background-remove-ghoti-market.png";
 
   const image =
     seller.banner ||
