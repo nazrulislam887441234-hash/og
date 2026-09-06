@@ -19,90 +19,165 @@ export default {
       `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
     // =========================================================
-    // REQUEST / BOT DETECTION
+    // REQUEST METHOD
     // =========================================================
 
-    const userAgent = request.headers.get("user-agent") || "";
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return fetch(request);
+    }
+
+    // =========================================================
+    // USER AGENT
+    // =========================================================
+
+    const userAgent =
+      request.headers.get("user-agent") || "";
 
     const isBot =
       /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|SkypeUriPreview|Pinterest|Applebot|Googlebot|Google-InspectionTool|bingbot|Discordbot|redditbot|vkShare|Embedly|Quora Link Preview|outbrain|W3C_Validator/i.test(
         userAgent
       );
 
-    // Only GET/HEAD should be processed.
-    if (request.method !== "GET" && request.method !== "HEAD") {
-      return fetch(request);
-    }
+    // =========================================================
+    // PATH
+    // =========================================================
+
+    const pathname = url.pathname;
+    const normalizedPathname = pathname
+      .replace(/\/+/g, "/")
+      .toLowerCase();
+
+    const searchParams = url.searchParams;
 
     // =========================================================
-    // BOT → GENERATE OG HTML
+    // BOT REQUEST
     // =========================================================
 
     if (isBot) {
       try {
-        const pathname = url.pathname.toLowerCase();
-        const searchParams = url.searchParams;
-
         // =====================================================
-        // 1. PRODUCT PAGE DETECTION
+        // PRODUCT
         // =====================================================
 
-        const productInfo = getProductSlug(pathname, searchParams);
+        const productInfo = getProductSlug(
+          pathname,
+          searchParams
+        );
 
-        if (productInfo.isProductPage && productInfo.slug) {
-          const product = await getProductBySlug(productInfo.slug);
+        if (
+          productInfo.isProductPage &&
+          productInfo.slug
+        ) {
+          const product =
+            await getProductBySlug(
+              productInfo.slug
+            );
 
           if (product) {
-            const html = buildProductHTML(product, url, MAIN_SITE);
+            const html =
+              buildProductHTML(
+                product,
+                url,
+                MAIN_SITE
+              );
 
-            return new Response(html, {
-              status: 200,
-              headers: {
-                "Content-Type": "text/html; charset=UTF-8",
-                "Cache-Control":
-                  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-                "X-Robots-Tag": "index, follow",
-              },
-            });
+            return new Response(
+              request.method === "HEAD"
+                ? null
+                : html,
+              {
+                status: 200,
+
+                headers: {
+                  "Content-Type":
+                    "text/html; charset=UTF-8",
+
+                  "Cache-Control":
+                    "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+
+                  "X-Robots-Tag":
+                    "index, follow",
+
+                  "Vary":
+                    "User-Agent",
+                },
+              }
+            );
           }
         }
 
         // =====================================================
-        // 2. SELLER / SHOP / PROFILE PAGE DETECTION
+        // SELLER / SHOP / PROFILE
         // =====================================================
 
-        const sellerInfo = getSellerIdentifier(pathname, searchParams);
+        const sellerInfo =
+          getSellerIdentifier(
+            pathname,
+            searchParams
+          );
 
-        if (sellerInfo.isSellerPage && sellerInfo.identifier) {
-          const seller = await getSeller(sellerInfo.identifier);
+        if (
+          sellerInfo.isSellerPage &&
+          sellerInfo.identifier
+        ) {
+          const seller =
+            await getSeller(
+              sellerInfo.identifier
+            );
 
           if (seller) {
-            const html = buildSellerHTML(seller, url, MAIN_SITE);
+            const html =
+              buildSellerHTML(
+                seller,
+                url,
+                MAIN_SITE
+              );
 
-            return new Response(html, {
-              status: 200,
-              headers: {
-                "Content-Type": "text/html; charset=UTF-8",
-                "Cache-Control":
-                  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-                "X-Robots-Tag": "index, follow",
-              },
-            });
+            return new Response(
+              request.method === "HEAD"
+                ? null
+                : html,
+              {
+                status: 200,
+
+                headers: {
+                  "Content-Type":
+                    "text/html; charset=UTF-8",
+
+                  "Cache-Control":
+                    "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+
+                  "X-Robots-Tag":
+                    "index, follow",
+
+                  "Vary":
+                    "User-Agent",
+                },
+              }
+            );
           }
         }
       } catch (error) {
-        console.error("GHOTI MARKET OG Worker Error:", error);
+        console.error(
+          "GHOTI MARKET OG Worker Error:",
+          error
+        );
       }
     }
 
     // =========================================================
-    // 3. NORMAL USERS → WWW REDIRECT
+    // NORMAL USER
     // =========================================================
 
     const redirectUrl =
-      MAIN_SITE + url.pathname + url.search;
+      MAIN_SITE +
+      url.pathname +
+      url.search;
 
-    return Response.redirect(redirectUrl, 302);
+    return Response.redirect(
+      redirectUrl,
+      302
+    );
   },
 };
 
@@ -111,12 +186,22 @@ export default {
 // PRODUCT SLUG DETECTION
 // =============================================================
 
-function getProductSlug(pathname, searchParams) {
-  const cleanPath = pathname.replace(/\/+/g, "/");
+function getProductSlug(
+  pathname,
+  searchParams
+) {
+  const cleanPath =
+    pathname
+      .replace(/\/+/g, "/")
+      .toLowerCase();
 
   const isProductPage =
-    cleanPath.includes("/product") ||
-    cleanPath.includes("/product.html");
+    cleanPath === "/product" ||
+    cleanPath === "/product/" ||
+    cleanPath === "/product.html" ||
+    cleanPath === "/product.html/" ||
+    cleanPath.startsWith("/product/") ||
+    cleanPath.startsWith("/product.html/");
 
   if (!isProductPage) {
     return {
@@ -125,11 +210,12 @@ function getProductSlug(pathname, searchParams) {
     };
   }
 
-  // -----------------------------------------------------------
-  // Case 1:
-  // /product?product-slug=iphone-15
-  // /product?slug=iphone-15
-  // -----------------------------------------------------------
+  // ===========================================================
+  // CASE 1
+  //
+  // /product.html?slug=iphone-15
+  // /product.html?product-slug=iphone-15
+  // ===========================================================
 
   let slug =
     searchParams.get("product-slug") ||
@@ -142,38 +228,46 @@ function getProductSlug(pathname, searchParams) {
     };
   }
 
-  // -----------------------------------------------------------
-  // Case 2:
+  // ===========================================================
+  // CASE 2
+  //
   // /product/iphone-15
   // /product.html/iphone-15
-  // -----------------------------------------------------------
+  // ===========================================================
 
-  const parts = cleanPath
-    .split("/")
-    .filter(Boolean);
+  const parts =
+    pathname
+      .replace(/\/+/g, "/")
+      .split("/")
+      .filter(Boolean);
 
-  const lastPart = parts[parts.length - 1];
+  if (parts.length >= 2) {
+    const lastPart =
+      parts[parts.length - 1];
 
-  if (
-    lastPart &&
-    ![
-      "product",
-      "product.html",
-    ].includes(lastPart)
-  ) {
-    return {
-      isProductPage: true,
-      slug: safeDecode(lastPart).trim(),
-    };
+    const lowerLastPart =
+      lastPart.toLowerCase();
+
+    if (
+      lowerLastPart !== "product" &&
+      lowerLastPart !== "product.html"
+    ) {
+      return {
+        isProductPage: true,
+        slug: safeDecode(lastPart).trim(),
+      };
+    }
   }
 
-  // -----------------------------------------------------------
-  // Case 3:
-  // /product?iphone-15
-  // -----------------------------------------------------------
+  // ===========================================================
+  // CASE 3
+  //
+  // /product.html?iphone-15
+  // ===========================================================
 
   for (const [key, value] of searchParams.entries()) {
-    const lowerKey = key.toLowerCase();
+    const lowerKey =
+      key.toLowerCase();
 
     if (
       lowerKey === "fbclid" ||
@@ -183,7 +277,10 @@ function getProductSlug(pathname, searchParams) {
       continue;
     }
 
-    if (value === "" && key.trim()) {
+    if (
+      value === "" &&
+      key.trim()
+    ) {
       return {
         isProductPage: true,
         slug: safeDecode(key).trim(),
@@ -199,14 +296,16 @@ function getProductSlug(pathname, searchParams) {
 
 
 // =============================================================
-// PRODUCT FIRESTORE QUERY
+// GET PRODUCT FROM FIRESTORE
 // =============================================================
 
 async function getProductBySlug(slug) {
   try {
     const queryUrl =
-      "https://firestore.googleapis.com/v1/projects/" +
-      "ghotimarket/databases/(default)/documents:runQuery";
+      `${FIRESTORE_BASE.replace(
+        "/documents",
+        "/documents:runQuery"
+      )}`;
 
     const body = {
       structuredQuery: {
@@ -221,7 +320,9 @@ async function getProductBySlug(slug) {
             field: {
               fieldPath: "slug",
             },
+
             op: "EQUAL",
+
             value: {
               stringValue: slug,
             },
@@ -232,13 +333,17 @@ async function getProductBySlug(slug) {
       },
     };
 
-    const response = await fetch(queryUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    const response =
+      await fetch(queryUrl, {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body: JSON.stringify(body),
+      });
 
     if (!response.ok) {
       console.error(
@@ -249,17 +354,21 @@ async function getProductBySlug(slug) {
       return null;
     }
 
-    const result = await response.json();
+    const result =
+      await response.json();
 
-    const document = result?.find(
-      (item) => item?.document?.fields
-    )?.document;
+    const document =
+      result?.find(
+        item =>
+          item?.document?.fields
+      )?.document;
 
     if (!document) {
       return null;
     }
 
-    const fields = document.fields;
+    const fields =
+      document.fields;
 
     return {
       name:
@@ -281,33 +390,49 @@ async function getProductBySlug(slug) {
         getNumber(fields.oldPrice),
 
       image:
-        getFirstArrayString(fields.images) ||
+        getFirstArrayString(
+          fields.images
+        ) ||
         DEFAULT_PRODUCT_IMAGE,
 
       active:
-        getBoolean(fields.active, true),
+        getBoolean(
+          fields.active,
+          true
+        ),
 
       shopName:
         getString(fields.shopName) ||
         "GHOTI MARKET Seller",
     };
   } catch (error) {
-    console.error("getProductBySlug Error:", error);
+    console.error(
+      "getProductBySlug Error:",
+      error
+    );
+
     return null;
   }
 }
 
 
 // =============================================================
-// SELLER IDENTIFIER DETECTION
+// SELLER IDENTIFIER
 // =============================================================
 
-function getSellerIdentifier(pathname, searchParams) {
-  const cleanPath = pathname.replace(/\/+/g, "/");
+function getSellerIdentifier(
+  pathname,
+  searchParams
+) {
+  const cleanPath =
+    pathname
+      .replace(/\/+/g, "/")
+      .toLowerCase();
 
-  const parts = cleanPath
-    .split("/")
-    .filter(Boolean);
+  const parts =
+    cleanPath
+      .split("/")
+      .filter(Boolean);
 
   const sellerPaths = [
     "seller",
@@ -318,10 +443,13 @@ function getSellerIdentifier(pathname, searchParams) {
     "profile.html",
   ];
 
-  const firstPart = parts[0] || "";
+  const firstPart =
+    parts[0] || "";
 
   const isSellerPage =
-    sellerPaths.includes(firstPart);
+    sellerPaths.includes(
+      firstPart
+    );
 
   if (!isSellerPage) {
     return {
@@ -330,54 +458,71 @@ function getSellerIdentifier(pathname, searchParams) {
     };
   }
 
-  // -----------------------------------------------------------
-  // Case 1:
+  // ===========================================================
   // ?sellerId=abc
   // ?username=abc
-  // -----------------------------------------------------------
+  // ===========================================================
 
   let identifier =
-    searchParams.get("sellerId") ||
-    searchParams.get("username");
+    searchParams.get(
+      "sellerId"
+    ) ||
+    searchParams.get(
+      "username"
+    );
 
   if (identifier) {
     return {
       isSellerPage: true,
-      identifier: cleanIdentifier(identifier),
+
+      identifier:
+        cleanIdentifier(
+          identifier
+        ),
     };
   }
 
-  // -----------------------------------------------------------
-  // Case 2:
+  // ===========================================================
   // /seller/abc
   // /shop/abc
   // /profile/abc
-  // -----------------------------------------------------------
+  // ===========================================================
 
   if (parts.length >= 2) {
-    const lastPart = parts[parts.length - 1];
+    const lastPart =
+      parts[parts.length - 1];
 
     if (
       lastPart &&
-      !sellerPaths.includes(lastPart)
+      !sellerPaths.includes(
+        lastPart
+      )
     ) {
       return {
         isSellerPage: true,
-        identifier: cleanIdentifier(lastPart),
+
+        identifier:
+          cleanIdentifier(
+            lastPart
+          ),
       };
     }
   }
 
-  // -----------------------------------------------------------
-  // Case 3:
+  // ===========================================================
   // ?@username
   // ?username
-  // -----------------------------------------------------------
+  // ===========================================================
 
-  for (const [key, value] of searchParams.entries()) {
-    const cleanKey = safeDecode(key).trim();
+  for (
+    const [key, value]
+    of searchParams.entries()
+  ) {
+    const cleanKey =
+      safeDecode(key).trim();
 
-    const lowerKey = cleanKey.toLowerCase();
+    const lowerKey =
+      cleanKey.toLowerCase();
 
     if (
       lowerKey === "fbclid" ||
@@ -387,17 +532,30 @@ function getSellerIdentifier(pathname, searchParams) {
       continue;
     }
 
-    if (cleanKey.startsWith("@")) {
+    if (
+      cleanKey.startsWith("@")
+    ) {
       return {
         isSellerPage: true,
-        identifier: cleanIdentifier(cleanKey),
+
+        identifier:
+          cleanIdentifier(
+            cleanKey
+          ),
       };
     }
 
-    if (value === "" && cleanKey) {
+    if (
+      value === "" &&
+      cleanKey
+    ) {
       return {
         isSellerPage: true,
-        identifier: cleanIdentifier(cleanKey),
+
+        identifier:
+          cleanIdentifier(
+            cleanKey
+          ),
       };
     }
   }
@@ -413,43 +571,58 @@ function getSellerIdentifier(pathname, searchParams) {
 // GET SELLER
 // =============================================================
 
-async function getSeller(identifier) {
+async function getSeller(
+  identifier
+) {
   try {
+
     // ---------------------------------------------------------
     // 1. public_sellers/{identifier}
     // ---------------------------------------------------------
 
-    let response = await fetch(
-      `${FIRESTORE_BASE}/public_sellers/${encodeURIComponent(identifier)}`
-    );
+    let response =
+      await fetch(
+        `${FIRESTORE_BASE}/public_sellers/${encodeURIComponent(identifier)}`
+      );
 
-    let data = await response.json();
+    let data =
+      await response.json();
 
     if (data?.fields) {
-      return normalizeSeller(data.fields, identifier);
+      return normalizeSeller(
+        data.fields,
+        identifier
+      );
     }
 
     // ---------------------------------------------------------
     // 2. users/{identifier}
     // ---------------------------------------------------------
 
-    response = await fetch(
-      `${FIRESTORE_BASE}/users/${encodeURIComponent(identifier)}`
-    );
+    response =
+      await fetch(
+        `${FIRESTORE_BASE}/users/${encodeURIComponent(identifier)}`
+      );
 
-    data = await response.json();
+    data =
+      await response.json();
 
     if (data?.fields) {
-      return normalizeSeller(data.fields, identifier);
+      return normalizeSeller(
+        data.fields,
+        identifier
+      );
     }
 
     // ---------------------------------------------------------
-    // 3. Search users where username == identifier
+    // 3. username query
     // ---------------------------------------------------------
 
     const queryUrl =
-      "https://firestore.googleapis.com/v1/projects/" +
-      "ghotimarket/databases/(default)/documents:runQuery";
+      `${FIRESTORE_BASE.replace(
+        "/documents",
+        "/documents:runQuery"
+      )}`;
 
     const body = {
       structuredQuery: {
@@ -462,11 +635,15 @@ async function getSeller(identifier) {
         where: {
           fieldFilter: {
             field: {
-              fieldPath: "username",
+              fieldPath:
+                "username",
             },
+
             op: "EQUAL",
+
             value: {
-              stringValue: identifier,
+              stringValue:
+                identifier,
             },
           },
         },
@@ -475,23 +652,34 @@ async function getSeller(identifier) {
       },
     };
 
-    response = await fetch(queryUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    response =
+      await fetch(
+        queryUrl,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            JSON.stringify(body),
+        }
+      );
 
     if (!response.ok) {
       return null;
     }
 
-    const result = await response.json();
+    const result =
+      await response.json();
 
-    const document = result?.find(
-      (item) => item?.document?.fields
-    )?.document;
+    const document =
+      result?.find(
+        item =>
+          item?.document?.fields
+      )?.document;
 
     if (!document) {
       return null;
@@ -501,8 +689,14 @@ async function getSeller(identifier) {
       document.fields,
       identifier
     );
+
   } catch (error) {
-    console.error("getSeller Error:", error);
+
+    console.error(
+      "getSeller Error:",
+      error
+    );
+
     return null;
   }
 }
@@ -512,34 +706,60 @@ async function getSeller(identifier) {
 // NORMALIZE SELLER
 // =============================================================
 
-function normalizeSeller(fields, identifier) {
+function normalizeSeller(
+  fields,
+  identifier
+) {
   return {
+
     identifier,
 
     name:
-      getString(fields.shopName) ||
-      getString(fields.name) ||
+      getString(
+        fields.shopName
+      ) ||
+      getString(
+        fields.name
+      ) ||
       "GHOTI MARKET Seller",
 
     description:
-      getString(fields.shopDescription) ||
-      getString(fields.description) ||
+      getString(
+        fields.shopDescription
+      ) ||
+      getString(
+        fields.description
+      ) ||
       "GHOTI MARKET-এ এই Seller-এর পণ্য দেখুন।",
 
     logo:
-      getString(fields.shopLogo) ||
-      getString(fields.photoURL) ||
+      getString(
+        fields.shopLogo
+      ) ||
+      getString(
+        fields.photoURL
+      ) ||
       DEFAULT_SELLER_IMAGE,
 
     banner:
-      getString(fields.shopBanner) ||
-      getString(fields.banner) ||
-      getString(fields.shopLogo) ||
-      getString(fields.photoURL) ||
+      getString(
+        fields.shopBanner
+      ) ||
+      getString(
+        fields.banner
+      ) ||
+      getString(
+        fields.shopLogo
+      ) ||
+      getString(
+        fields.photoURL
+      ) ||
       DEFAULT_SELLER_IMAGE,
 
     username:
-      getString(fields.username) ||
+      getString(
+        fields.username
+      ) ||
       identifier,
   };
 }
@@ -549,24 +769,32 @@ function normalizeSeller(fields, identifier) {
 // PRODUCT HTML
 // =============================================================
 
-function buildProductHTML(product, url, mainSite) {
+function buildProductHTML(
+  product,
+  url,
+  mainSite
+) {
   const title =
     `${product.name} - ৳${formatPrice(product.price)} | GHOTI MARKET`;
 
   const description =
     truncate(
-      stripHTML(product.description),
+      stripHTML(
+        product.description
+      ),
       160
     );
 
   const image =
-    product.image || DEFAULT_PRODUCT_IMAGE;
+    product.image ||
+    DEFAULT_PRODUCT_IMAGE;
 
   const canonical =
     `${mainSite}${url.pathname}${url.search}`;
 
   return `<!DOCTYPE html>
 <html lang="bn">
+
 <head>
 
 <meta charset="UTF-8">
@@ -581,8 +809,6 @@ function buildProductHTML(product, url, mainSite) {
 
 <link rel="canonical"
       href="${escapeAttr(canonical)}">
-
-<!-- Open Graph -->
 
 <meta property="og:title"
       content="${escapeAttr(title)}">
@@ -607,8 +833,6 @@ function buildProductHTML(product, url, mainSite) {
 
 <meta property="product:price:currency"
       content="BDT">
-
-<!-- Twitter -->
 
 <meta name="twitter:card"
       content="summary_large_image">
@@ -638,6 +862,7 @@ function buildProductHTML(product, url, mainSite) {
 >
 
 </body>
+
 </html>`;
 }
 
@@ -646,13 +871,19 @@ function buildProductHTML(product, url, mainSite) {
 // SELLER HTML
 // =============================================================
 
-function buildSellerHTML(seller, url, mainSite) {
+function buildSellerHTML(
+  seller,
+  url,
+  mainSite
+) {
   const title =
     `${seller.name} | GHOTI MARKET`;
 
   const description =
     truncate(
-      stripHTML(seller.description),
+      stripHTML(
+        seller.description
+      ),
       160
     );
 
@@ -666,6 +897,7 @@ function buildSellerHTML(seller, url, mainSite) {
 
   return `<!DOCTYPE html>
 <html lang="bn">
+
 <head>
 
 <meta charset="UTF-8">
@@ -680,8 +912,6 @@ function buildSellerHTML(seller, url, mainSite) {
 
 <link rel="canonical"
       href="${escapeAttr(canonical)}">
-
-<!-- Open Graph -->
 
 <meta property="og:title"
       content="${escapeAttr(title)}">
@@ -700,8 +930,6 @@ function buildSellerHTML(seller, url, mainSite) {
 
 <meta property="og:site_name"
       content="GHOTI MARKET">
-
-<!-- Twitter -->
 
 <meta name="twitter:card"
       content="summary_large_image">
@@ -731,6 +959,7 @@ function buildSellerHTML(seller, url, mainSite) {
 >
 
 </body>
+
 </html>`;
 }
 
@@ -740,23 +969,30 @@ function buildSellerHTML(seller, url, mainSite) {
 // =============================================================
 
 function getString(field) {
-  if (!field) return "";
+  if (!field) {
+    return "";
+  }
 
-  return (
-    field.stringValue ??
-    ""
-  );
+  return field.stringValue ?? "";
 }
 
 
 function getNumber(field) {
-  if (!field) return "";
+  if (!field) {
+    return "";
+  }
 
-  if (field.integerValue !== undefined) {
+  if (
+    field.integerValue !==
+    undefined
+  ) {
     return field.integerValue;
   }
 
-  if (field.doubleValue !== undefined) {
+  if (
+    field.doubleValue !==
+    undefined
+  ) {
     return field.doubleValue;
   }
 
@@ -764,10 +1000,18 @@ function getNumber(field) {
 }
 
 
-function getBoolean(field, fallback = false) {
-  if (!field) return fallback;
+function getBoolean(
+  field,
+  fallback = false
+) {
+  if (!field) {
+    return fallback;
+  }
 
-  if (field.booleanValue !== undefined) {
+  if (
+    field.booleanValue !==
+    undefined
+  ) {
     return field.booleanValue;
   }
 
@@ -775,13 +1019,22 @@ function getBoolean(field, fallback = false) {
 }
 
 
-function getFirstArrayString(field) {
-  if (!field?.arrayValue?.values) {
+function getFirstArrayString(
+  field
+) {
+  if (
+    !field?.arrayValue?.values
+  ) {
     return "";
   }
 
-  for (const item of field.arrayValue.values) {
-    if (item?.stringValue) {
+  for (
+    const item
+    of field.arrayValue.values
+  ) {
+    if (
+      item?.stringValue
+    ) {
       return item.stringValue;
     }
   }
@@ -791,16 +1044,33 @@ function getFirstArrayString(field) {
 
 
 // =============================================================
-// SECURITY / STRING HELPERS
+// STRING / SECURITY HELPERS
 // =============================================================
 
 function escapeHTML(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return String(
+    value ?? ""
+  )
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#39;"
+    );
 }
 
 
@@ -810,50 +1080,90 @@ function escapeAttr(value) {
 
 
 function stripHTML(value) {
-  return String(value ?? "")
-    .replace(/<[^>]*>/g, "")
-    .replace(/\s+/g, " ")
+  return String(
+    value ?? ""
+  )
+    .replace(
+      /<[^>]*>/g,
+      ""
+    )
+    .replace(
+      /\s+/g,
+      " "
+    )
     .trim();
 }
 
 
-function truncate(value, maxLength) {
-  const text = String(value ?? "").trim();
+function truncate(
+  value,
+  maxLength
+) {
+  const text =
+    String(
+      value ?? ""
+    ).trim();
 
-  if (text.length <= maxLength) {
+  if (
+    text.length <=
+    maxLength
+  ) {
     return text;
   }
 
-  return text.substring(0, maxLength - 3) + "...";
+  return (
+    text.substring(
+      0,
+      maxLength - 3
+    ) + "..."
+  );
 }
 
 
 function safeDecode(value) {
   try {
-    return decodeURIComponent(value);
+    return decodeURIComponent(
+      value
+    );
   } catch {
     return value;
   }
 }
 
 
-function cleanIdentifier(value) {
-  return safeDecode(String(value ?? ""))
+function cleanIdentifier(
+  value
+) {
+  return safeDecode(
+    String(value ?? "")
+  )
     .trim()
-    .replace(/^@+/, "");
+    .replace(
+      /^@+/,
+      ""
+    );
 }
 
 
 function formatPrice(value) {
-  if (value === "" || value === null || value === undefined) {
+  if (
+    value === "" ||
+    value === null ||
+    value === undefined
+  ) {
     return "";
   }
 
-  const number = Number(value);
+  const number =
+    Number(value);
 
-  if (!Number.isFinite(number)) {
+  if (
+    !Number.isFinite(number)
+  ) {
     return String(value);
   }
 
-  return number.toLocaleString("en-US");
+  return number.toLocaleString(
+    "en-US"
+  );
 }
