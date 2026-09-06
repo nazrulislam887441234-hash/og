@@ -1,3 +1,70 @@
 name = "og"
-main = "src/index.js"
+main = "./src/index.js"
 compatibility_date = "2026-09-06"
+
+workers_dev = false
+
+# =========================
+# WWW - PRODUCT
+# =========================
+
+[[routes]]
+pattern = "www.ghotimarket.com/product*"
+zone_name = "ghotimarket.com"
+
+# =========================
+# WWW - SELLER
+# =========================
+
+[[routes]]
+pattern = "www.ghotimarket.com/seller*"
+zone_name = "ghotimarket.com"
+
+# =========================
+# WWW - SHOP
+# =========================
+
+[[routes]]
+pattern = "www.ghotimarket.com/shop*"
+zone_name = "ghotimarket.com"
+
+# =========================
+# WWW - PROFILE
+# =========================
+
+[[routes]]
+pattern = "www.ghotimarket.com/profile*"
+zone_name = "ghotimarket.com"
+
+
+# =========================
+# NON-WWW - PRODUCT
+# =========================
+
+[[routes]]
+pattern = "ghotimarket.com/product*"
+zone_name = "ghotimarket.com"
+
+# =========================
+# NON-WWW - SELLER
+# =========================
+
+[[routes]]
+pattern = "ghotimarket.com/seller*"
+zone_name = "ghotimarket.com"
+
+# =========================
+# NON-WWW - SHOP
+# =========================
+
+[[routes]]
+pattern = "ghotimarket.com/shop*"
+zone_name = "ghotimarket.com"
+
+# =========================
+# NON-WWW - PROFILE
+# =========================
+
+[[routes]]
+pattern = "ghotimarket.com/profile*"
+zone_name = "ghotimarket.com"
