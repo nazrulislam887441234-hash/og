@@ -26,147 +26,121 @@ export default {
       return fetch(request);
     }
 
-    // =========================================================
-    // USER AGENT
-    // =========================================================
-
-    const userAgent =
-      request.headers.get("user-agent") || "";
-
-    const isBot =
-      /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|WhatsApp|TelegramBot|Slackbot|SkypeUriPreview|Pinterest|Applebot|Googlebot|Google-InspectionTool|bingbot|Discordbot|redditbot|vkShare|Embedly|Quora Link Preview|outbrain|W3C_Validator/i.test(
-        userAgent
-      );
-
-    // =========================================================
-    // PATH
-    // =========================================================
-
     const pathname = url.pathname;
-    const normalizedPathname = pathname
-      .replace(/\/+/g, "/")
-      .toLowerCase();
-
     const searchParams = url.searchParams;
 
-    // =========================================================
-    // BOT REQUEST
-    // =========================================================
+    try {
+      // =====================================================
+      // PRODUCT
+      // =====================================================
 
-    if (isBot) {
-      try {
-        // =====================================================
-        // PRODUCT
-        // =====================================================
+      const productInfo = getProductSlug(
+        pathname,
+        searchParams
+      );
 
-        const productInfo = getProductSlug(
+      if (
+        productInfo.isProductPage &&
+        productInfo.slug
+      ) {
+        const product =
+          await getProductBySlug(
+            productInfo.slug
+          );
+
+        if (product) {
+          const html =
+            buildProductHTML(
+              product,
+              url,
+              MAIN_SITE
+            );
+
+          return new Response(
+            request.method === "HEAD"
+              ? null
+              : html,
+            {
+              status: 200,
+
+              headers: {
+                "Content-Type":
+                  "text/html; charset=UTF-8",
+
+                "Cache-Control":
+                  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+
+                "X-Robots-Tag":
+                  "index, follow",
+
+                "Vary":
+                  "User-Agent",
+              },
+            }
+          );
+        }
+      }
+
+      // =====================================================
+      // SELLER / SHOP / PROFILE
+      // =====================================================
+
+      const sellerInfo =
+        getSellerIdentifier(
           pathname,
           searchParams
         );
 
-        if (
-          productInfo.isProductPage &&
-          productInfo.slug
-        ) {
-          const product =
-            await getProductBySlug(
-              productInfo.slug
-            );
-
-          if (product) {
-            const html =
-              buildProductHTML(
-                product,
-                url,
-                MAIN_SITE
-              );
-
-            return new Response(
-              request.method === "HEAD"
-                ? null
-                : html,
-              {
-                status: 200,
-
-                headers: {
-                  "Content-Type":
-                    "text/html; charset=UTF-8",
-
-                  "Cache-Control":
-                    "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-
-                  "X-Robots-Tag":
-                    "index, follow",
-
-                  "Vary":
-                    "User-Agent",
-                },
-              }
-            );
-          }
-        }
-
-        // =====================================================
-        // SELLER / SHOP / PROFILE
-        // =====================================================
-
-        const sellerInfo =
-          getSellerIdentifier(
-            pathname,
-            searchParams
+      if (
+        sellerInfo.isSellerPage &&
+        sellerInfo.identifier
+      ) {
+        const seller =
+          await getSeller(
+            sellerInfo.identifier
           );
 
-        if (
-          sellerInfo.isSellerPage &&
-          sellerInfo.identifier
-        ) {
-          const seller =
-            await getSeller(
-              sellerInfo.identifier
+        if (seller) {
+          const html =
+            buildSellerHTML(
+              seller,
+              url,
+              MAIN_SITE
             );
 
-          if (seller) {
-            const html =
-              buildSellerHTML(
-                seller,
-                url,
-                MAIN_SITE
-              );
+          return new Response(
+            request.method === "HEAD"
+              ? null
+              : html,
+            {
+              status: 200,
 
-            return new Response(
-              request.method === "HEAD"
-                ? null
-                : html,
-              {
-                status: 200,
+              headers: {
+                "Content-Type":
+                  "text/html; charset=UTF-8",
 
-                headers: {
-                  "Content-Type":
-                    "text/html; charset=UTF-8",
+                "Cache-Control":
+                  "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
 
-                  "Cache-Control":
-                    "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+                "X-Robots-Tag":
+                  "index, follow",
 
-                  "X-Robots-Tag":
-                    "index, follow",
-
-                  "Vary":
-                    "User-Agent",
-                },
-              }
-            );
-          }
+                "Vary":
+                  "User-Agent",
+              },
+            }
+          );
         }
-      } catch (error) {
-        console.error(
-          "GHOTI MARKET OG Worker Error:",
-          error
-        );
       }
+    } catch (error) {
+      console.error(
+        "GHOTI MARKET OG Worker Error:",
+        error
+      );
     }
 
     // =========================================================
-    // NORMAL USER
+    // FALLBACK FOR UNMATCHED PAGES
     // =========================================================
 
     const redirectUrl =
