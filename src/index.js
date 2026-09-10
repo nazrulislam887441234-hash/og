@@ -137,7 +137,10 @@ export default {
          * -true বাদ দেওয়া আসল seller identifier
          */
 
-        const seller = await getSeller(sellerInfo.identifier);
+        const seller = await getSeller(
+          sellerInfo.identifier,
+          sellerInfo.source
+        );
 
         if (seller) {
           const html = buildSellerHTML(seller, url);
@@ -253,6 +256,7 @@ function getProductSlug(pathname, searchParams) {
       slug: removeTrueSuffix(decoded),
       isTrueUrl,
       source: "value",
+      originalValue: slug,
     };
   }
 
@@ -344,6 +348,10 @@ function getProductSlug(pathname, searchParams) {
  * SELLER IDENTIFIER
  * ================================================================
  *
+ * IMPORTANT:
+ * /profile এবং /profile.html
+ * এখন seller preview system-এর বাইরে রাখা হয়েছে।
+ *
  * Supported:
  *
  * /seller?sellerId=abc
@@ -373,13 +381,42 @@ function getSellerIdentifier(pathname, searchParams) {
     .split("/")
     .filter(Boolean);
 
+  /*
+   * ============================================================
+   * PROFILE IS NOT A SELLER PREVIEW PAGE
+   * ============================================================
+   *
+   * /profile
+   * /profile/
+   * /profile.html
+   * /profile.html/
+   * /profile/anything
+   *
+   * সবসময় Worker-এর seller preview system থেকে বাদ।
+   * ============================================================
+   */
+
+  if (
+    cleanPath === "/profile" ||
+    cleanPath === "/profile/" ||
+    cleanPath === "/profile.html" ||
+    cleanPath === "/profile.html/" ||
+    cleanPath.startsWith("/profile/") ||
+    cleanPath.startsWith("/profile.html/")
+  ) {
+    return {
+      isSellerPage: false,
+      identifier: null,
+      isTrueUrl: false,
+      source: null,
+    };
+  }
+
   const sellerPaths = [
     "seller",
     "seller.html",
     "shop",
     "shop.html",
-    "profile",
-    "profile.html",
   ];
 
   const firstPart = parts[0] || "";
