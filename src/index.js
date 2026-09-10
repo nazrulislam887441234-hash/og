@@ -18,6 +18,50 @@ export default {
 
     /*
      * ============================================================
+     * PROFILE PAGE = COMPLETE WORKER BYPASS
+     * ============================================================
+     *
+     * এই URL এবং এর পরের সব path-এর জন্য
+     * Worker কোনো preview / redirect / -true কিছুই করবে না।
+     *
+     * /profile
+     * /profile/
+     * /profile/anything
+     * /profile/anything/here
+     *
+     * /profile.html
+     * /profile.html/
+     * /profile.html/anything
+     * /profile.html/anything/here
+     *
+     * Query থাকলেও bypass হবে:
+     *
+     * /profile?username=abc
+     * /profile.html?username=abc
+     *
+     * ============================================================
+     */
+
+    const cleanProfilePath = url.pathname
+      .replace(/\/+/g, "/")
+      .toLowerCase();
+
+    if (
+      cleanProfilePath === "/profile" ||
+      cleanProfilePath.startsWith("/profile/") ||
+      cleanProfilePath === "/profile.html" ||
+      cleanProfilePath.startsWith("/profile.html/")
+    ) {
+      /*
+       * PROFILE ROUTE-এ Worker সম্পূর্ণ disconnect।
+       *
+       * Original request সরাসরি origin-এ যাবে।
+       */
+      return fetch(request);
+    }
+
+    /*
+     * ============================================================
      * ONLY SOCIAL CRAWLERS / BOTS
      * ============================================================
      */
@@ -28,6 +72,7 @@ export default {
      * Normal browser/user:
      * Worker কিছু করবে না।
      */
+
     if (!crawler) {
       return fetch(request);
     }
@@ -42,58 +87,75 @@ export default {
        * ============================================================
        */
 
-      const productInfo = getProductSlug(pathname, searchParams);
+      const productInfo = getProductSlug(
+        pathname,
+        searchParams
+      );
 
-      if (productInfo.isProductPage && productInfo.slug) {
+      if (
+        productInfo.isProductPage &&
+        productInfo.slug
+      ) {
         /*
          * যদি URL-এ -true না থাকে,
          * crawler-কে একবার -true URL-এ পাঠানো হবে।
-         *
-         * Example:
-         *
-         * ?tarimmer-vih72aiz
-         *
-         * ↓
-         *
-         * ?tarimmer-vih72aiz-true
          */
 
         if (!productInfo.isTrueUrl) {
-          const redirectUrl = buildTrueUrl(url, productInfo);
+          const redirectUrl =
+            buildTrueUrl(
+              url,
+              productInfo
+            );
 
           return new Response(null, {
             status: 302,
             headers: {
-              Location: redirectUrl.toString(),
-              "Cache-Control": "no-store",
+              Location:
+                redirectUrl.toString(),
+              "Cache-Control":
+                "no-store",
             },
           });
         }
 
         /*
          * এখানে এসে -true URL।
-         *
-         * তাই আর redirect হবে না।
-         *
-         * getProductSlug() ইতিমধ্যে -true বাদ দিয়ে
-         * আসল slug দিয়েছে।
          */
 
-        const product = await getProductBySlug(productInfo.slug);
+        const product =
+          await getProductBySlug(
+            productInfo.slug
+          );
 
-        if (product && product.active !== false) {
-          const html = buildProductHTML(product, url);
+        if (
+          product &&
+          product.active !== false
+        ) {
+          const html =
+            buildProductHTML(
+              product,
+              url
+            );
 
           return new Response(
-            request.method === "HEAD" ? null : html,
+            request.method === "HEAD"
+              ? null
+              : html,
             {
               status: 200,
               headers: {
-                "Content-Type": "text/html; charset=UTF-8",
+                "Content-Type":
+                  "text/html; charset=UTF-8",
+
                 "Cache-Control":
                   "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-                "X-Robots-Tag": "index, follow",
-                "Vary": "User-Agent",
+
+                "X-Robots-Tag":
+                  "index, follow",
+
+                "Vary":
+                  "User-Agent",
               },
             }
           );
@@ -106,9 +168,16 @@ export default {
        * ============================================================
        */
 
-      const sellerInfo = getSellerIdentifier(pathname, searchParams);
+      const sellerInfo =
+        getSellerIdentifier(
+          pathname,
+          searchParams
+        );
 
-      if (sellerInfo.isSellerPage && sellerInfo.identifier) {
+      if (
+        sellerInfo.isSellerPage &&
+        sellerInfo.identifier
+      ) {
         /*
          * প্রথমবার:
          *
@@ -117,18 +186,23 @@ export default {
          * ↓
          *
          * sellerId=abc-true
-         *
-         * এরপর আর redirect হবে না।
          */
 
         if (!sellerInfo.isTrueUrl) {
-          const redirectUrl = buildTrueUrl(url, sellerInfo);
+          const redirectUrl =
+            buildTrueUrl(
+              url,
+              sellerInfo
+            );
 
           return new Response(null, {
             status: 302,
             headers: {
-              Location: redirectUrl.toString(),
-              "Cache-Control": "no-store",
+              Location:
+                redirectUrl.toString(),
+
+              "Cache-Control":
+                "no-store",
             },
           });
         }
@@ -137,24 +211,37 @@ export default {
          * -true বাদ দেওয়া আসল seller identifier
          */
 
-        const seller = await getSeller(
-          sellerInfo.identifier,
-          sellerInfo.source
-        );
+        const seller =
+          await getSeller(
+            sellerInfo.identifier,
+            sellerInfo.source
+          );
 
         if (seller) {
-          const html = buildSellerHTML(seller, url);
+          const html =
+            buildSellerHTML(
+              seller,
+              url
+            );
 
           return new Response(
-            request.method === "HEAD" ? null : html,
+            request.method === "HEAD"
+              ? null
+              : html,
             {
               status: 200,
               headers: {
-                "Content-Type": "text/html; charset=UTF-8",
+                "Content-Type":
+                  "text/html; charset=UTF-8",
+
                 "Cache-Control":
                   "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
-                "X-Robots-Tag": "index, follow",
-                "Vary": "User-Agent",
+
+                "X-Robots-Tag":
+                  "index, follow",
+
+                "Vary":
+                  "User-Agent",
               },
             }
           );
@@ -196,28 +283,16 @@ function isSocialCrawler(request) {
  * ================================================================
  * PRODUCT SLUG
  * ================================================================
- *
- * Supported:
- *
- * /product.html?tarimmer-vih72aiz
- *
- * /product.html?tarimmer-vih72aiz-true
- *
- * /product.html?product-slug=tarimmer-vih72aiz
- *
- * /product.html?product-slug=tarimmer-vih72aiz-true
- *
- * /product/tarimmer-vih72aiz
- *
- * /product/tarimmer-vih72aiz-true
- *
- * ================================================================
  */
 
-function getProductSlug(pathname, searchParams) {
-  const cleanPath = pathname
-    .replace(/\/+/g, "/")
-    .toLowerCase();
+function getProductSlug(
+  pathname,
+  searchParams
+) {
+  const cleanPath =
+    pathname
+      .replace(/\/+/g, "/")
+      .toLowerCase();
 
   const isProductPage =
     cleanPath === "/product" ||
@@ -243,17 +318,24 @@ function getProductSlug(pathname, searchParams) {
    */
 
   let slug =
-    searchParams.get("product-slug") ||
+    searchParams.get(
+      "product-slug"
+    ) ||
     searchParams.get("slug");
 
   if (slug) {
-    const decoded = safeDecode(slug).trim();
+    const decoded =
+      safeDecode(slug).trim();
 
-    const isTrueUrl = hasTrueSuffix(decoded);
+    const isTrueUrl =
+      hasTrueSuffix(decoded);
 
     return {
       isProductPage: true,
-      slug: removeTrueSuffix(decoded),
+      slug:
+        removeTrueSuffix(
+          decoded
+        ),
       isTrueUrl,
       source: "value",
       originalValue: slug,
@@ -262,19 +344,19 @@ function getProductSlug(pathname, searchParams) {
 
   /*
    * ------------------------------------------------------------
-   * PATH:
-   *
-   * /product/tarimmer-vih72aiz
+   * PATH
    * ------------------------------------------------------------
    */
 
-  const parts = pathname
-    .replace(/\/+/g, "/")
-    .split("/")
-    .filter(Boolean);
+  const parts =
+    pathname
+      .replace(/\/+/g, "/")
+      .split("/")
+      .filter(Boolean);
 
   if (parts.length >= 2) {
-    const lastPart = parts[parts.length - 1];
+    const lastPart =
+      parts[parts.length - 1];
 
     const lowerLastPart =
       lastPart.toLowerCase();
@@ -283,13 +365,20 @@ function getProductSlug(pathname, searchParams) {
       lowerLastPart !== "product" &&
       lowerLastPart !== "product.html"
     ) {
-      const decoded = safeDecode(lastPart).trim();
+      const decoded =
+        safeDecode(
+          lastPart
+        ).trim();
 
-      const isTrueUrl = hasTrueSuffix(decoded);
+      const isTrueUrl =
+        hasTrueSuffix(decoded);
 
       return {
         isProductPage: true,
-        slug: removeTrueSuffix(decoded),
+        slug:
+          removeTrueSuffix(
+            decoded
+          ),
         isTrueUrl,
         source: "path",
       };
@@ -298,16 +387,16 @@ function getProductSlug(pathname, searchParams) {
 
   /*
    * ------------------------------------------------------------
-   * BARE QUERY:
-   *
-   * ?tarimmer-vih72aiz
-   *
-   * ?tarimmer-vih72aiz-true
+   * BARE QUERY
    * ------------------------------------------------------------
    */
 
-  for (const [key, value] of searchParams.entries()) {
-    const lowerKey = key.toLowerCase();
+  for (
+    const [key, value]
+    of searchParams.entries()
+  ) {
+    const lowerKey =
+      key.toLowerCase();
 
     if (
       lowerKey === "fbclid" ||
@@ -317,16 +406,26 @@ function getProductSlug(pathname, searchParams) {
       continue;
     }
 
-    if (value === "" && key.trim()) {
+    if (
+      value === "" &&
+      key.trim()
+    ) {
       const decodedKey =
-        safeDecode(key).trim();
+        safeDecode(
+          key
+        ).trim();
 
       const isTrueUrl =
-        hasTrueSuffix(decodedKey);
+        hasTrueSuffix(
+          decodedKey
+        );
 
       return {
         isProductPage: true,
-        slug: removeTrueSuffix(decodedKey),
+        slug:
+          removeTrueSuffix(
+            decodedKey
+          ),
         isTrueUrl,
         source: "key",
         originalKey: key,
@@ -348,52 +447,31 @@ function getProductSlug(pathname, searchParams) {
  * SELLER IDENTIFIER
  * ================================================================
  *
- * IMPORTANT:
  * /profile এবং /profile.html
- * এখন seller preview system-এর বাইরে রাখা হয়েছে।
+ * এখানে আর আসার সুযোগ নেই।
  *
- * Supported:
- *
- * /seller?sellerId=abc
- * /seller?sellerId=abc-true
- *
- * /shop?sellerId=abc
- * /shop?sellerId=abc-true
- *
- * /seller?username=abc
- * /seller?username=abc-true
- *
- * /seller?@womenfashion
- * /seller?@womenfashion-true
- *
- * /seller/abc
- * /seller/abc-true
+ * কারণ fetch() এর একদম শুরুতেই
+ * profile route Worker bypass করে দেওয়া হয়েছে।
  *
  * ================================================================
  */
 
-function getSellerIdentifier(pathname, searchParams) {
-  const cleanPath = pathname
-    .replace(/\/+/g, "/")
-    .toLowerCase();
+function getSellerIdentifier(
+  pathname,
+  searchParams
+) {
+  const cleanPath =
+    pathname
+      .replace(/\/+/g, "/")
+      .toLowerCase();
 
-  const parts = cleanPath
-    .split("/")
-    .filter(Boolean);
+  const parts =
+    cleanPath
+      .split("/")
+      .filter(Boolean);
 
   /*
-   * ============================================================
-   * PROFILE IS NOT A SELLER PREVIEW PAGE
-   * ============================================================
-   *
-   * /profile
-   * /profile/
-   * /profile.html
-   * /profile.html/
-   * /profile/anything
-   *
-   * সবসময় Worker-এর seller preview system থেকে বাদ।
-   * ============================================================
+   * PROFILE EXTRA SAFETY
    */
 
   if (
@@ -419,9 +497,14 @@ function getSellerIdentifier(pathname, searchParams) {
     "shop.html",
   ];
 
-  const firstPart = parts[0] || "";
+  const firstPart =
+    parts[0] || "";
 
-  if (!sellerPaths.includes(firstPart)) {
+  if (
+    !sellerPaths.includes(
+      firstPart
+    )
+  ) {
     return {
       isSellerPage: false,
       identifier: null,
@@ -433,112 +516,150 @@ function getSellerIdentifier(pathname, searchParams) {
   /*
    * ============================================================
    * sellerId=
-   *
-   * IMPORTANT:
-   * sellerId হলে users collection-এর document ID খোঁজা হবে।
    * ============================================================
    */
 
   const sellerId =
-    searchParams.get("sellerId");
+    searchParams.get(
+      "sellerId"
+    );
 
   if (sellerId) {
     const decoded =
-      safeDecode(sellerId).trim();
+      safeDecode(
+        sellerId
+      ).trim();
 
     const isTrueUrl =
-      hasTrueSuffix(decoded);
+      hasTrueSuffix(
+        decoded
+      );
 
     return {
       isSellerPage: true,
-      identifier: cleanIdentifier(
-        removeTrueSuffix(decoded)
-      ),
+
+      identifier:
+        cleanIdentifier(
+          removeTrueSuffix(
+            decoded
+          )
+        ),
+
       isTrueUrl,
-      source: "sellerId",
-      originalValue: sellerId,
+
+      source:
+        "sellerId",
+
+      originalValue:
+        sellerId,
     };
   }
 
   /*
    * ============================================================
    * username=
-   *
-   * username হলে users collection-এর
-   * username field দিয়ে query হবে।
    * ============================================================
    */
 
   const username =
-    searchParams.get("username") ||
-    searchParams.get("sellerUsername");
+    searchParams.get(
+      "username"
+    ) ||
+    searchParams.get(
+      "sellerUsername"
+    );
 
   if (username) {
     const decoded =
-      safeDecode(username).trim();
+      safeDecode(
+        username
+      ).trim();
 
     const isTrueUrl =
-      hasTrueSuffix(decoded);
+      hasTrueSuffix(
+        decoded
+      );
 
     return {
       isSellerPage: true,
-      identifier: cleanIdentifier(
-        removeTrueSuffix(decoded)
-      ),
+
+      identifier:
+        cleanIdentifier(
+          removeTrueSuffix(
+            decoded
+          )
+        ),
+
       isTrueUrl,
-      source: "username",
-      originalValue: username,
+
+      source:
+        "username",
+
+      originalValue:
+        username,
     };
   }
 
   /*
    * ============================================================
-   * PATH:
-   *
-   * /seller/abc
-   * /shop/abc
+   * PATH
    * ============================================================
    */
 
   if (parts.length >= 2) {
     const lastPart =
-      parts[parts.length - 1];
+      parts[
+        parts.length - 1
+      ];
 
     if (
       lastPart &&
-      !sellerPaths.includes(lastPart)
+      !sellerPaths.includes(
+        lastPart
+      )
     ) {
       const decoded =
-        safeDecode(lastPart).trim();
+        safeDecode(
+          lastPart
+        ).trim();
 
       const isTrueUrl =
-        hasTrueSuffix(decoded);
+        hasTrueSuffix(
+          decoded
+        );
 
       return {
         isSellerPage: true,
-        identifier: cleanIdentifier(
-          removeTrueSuffix(decoded)
-        ),
+
+        identifier:
+          cleanIdentifier(
+            removeTrueSuffix(
+              decoded
+            )
+          ),
+
         isTrueUrl,
-        source: "path",
+
+        source:
+          "path",
       };
     }
   }
 
   /*
    * ============================================================
-   * BARE QUERY:
-   *
-   * ?@womenfashion
-   *
-   * ?@womenfashion-true
-   *
+   * BARE QUERY
    * ============================================================
    */
 
-  for (const [key, value] of searchParams.entries()) {
+  for (
+    const [key, value]
+    of searchParams.entries()
+  ) {
     const cleanKey =
-      safeDecode(key).trim();
+      safeDecode(
+        key
+      ).trim();
 
     const lowerKey =
       cleanKey.toLowerCase();
@@ -555,31 +676,56 @@ function getSellerIdentifier(pathname, searchParams) {
       cleanKey.startsWith("@")
     ) {
       const isTrueUrl =
-        hasTrueSuffix(cleanKey);
+        hasTrueSuffix(
+          cleanKey
+        );
 
       return {
         isSellerPage: true,
-        identifier: cleanIdentifier(
-          removeTrueSuffix(cleanKey)
-        ),
+
+        identifier:
+          cleanIdentifier(
+            removeTrueSuffix(
+              cleanKey
+            )
+          ),
+
         isTrueUrl,
-        source: "key",
-        originalKey: key,
+
+        source:
+          "key",
+
+        originalKey:
+          key,
       };
     }
 
-    if (value === "" && cleanKey) {
+    if (
+      value === "" &&
+      cleanKey
+    ) {
       const isTrueUrl =
-        hasTrueSuffix(cleanKey);
+        hasTrueSuffix(
+          cleanKey
+        );
 
       return {
         isSellerPage: true,
-        identifier: cleanIdentifier(
-          removeTrueSuffix(cleanKey)
-        ),
+
+        identifier:
+          cleanIdentifier(
+            removeTrueSuffix(
+              cleanKey
+            )
+          ),
+
         isTrueUrl,
-        source: "key",
-        originalKey: key,
+
+        source:
+          "key",
+
+        originalKey:
+          key,
       };
     }
   }
@@ -597,27 +743,19 @@ function getSellerIdentifier(pathname, searchParams) {
  * ================================================================
  * BUILD -TRUE URL
  * ================================================================
- *
- * IMPORTANT:
- * Original URL-এর host 그대로 থাকবে।
- *
- * ghotimarket.com
- * অথবা
- * www.ghotimarket.com
- *
- * যেটা দিয়ে request আসবে সেটাই থাকবে।
- * ================================================================
  */
 
-function buildTrueUrl(url, info) {
-  const newUrl = new URL(url.toString());
+function buildTrueUrl(
+  url,
+  info
+) {
+  const newUrl =
+    new URL(
+      url.toString()
+    );
 
   /*
    * PRODUCT VALUE
-   *
-   * ?product-slug=abc
-   * →
-   * ?product-slug=abc-true
    */
 
   if (
@@ -625,24 +763,36 @@ function buildTrueUrl(url, info) {
     info.originalValue
   ) {
     if (
-      newUrl.searchParams.has("product-slug")
+      newUrl.searchParams.has(
+        "product-slug"
+      )
     ) {
       const current =
-        newUrl.searchParams.get("product-slug");
+        newUrl.searchParams.get(
+          "product-slug"
+        );
 
       newUrl.searchParams.set(
         "product-slug",
-        addTrueSuffix(current)
+        addTrueSuffix(
+          current
+        )
       );
     } else if (
-      newUrl.searchParams.has("slug")
+      newUrl.searchParams.has(
+        "slug"
+      )
     ) {
       const current =
-        newUrl.searchParams.get("slug");
+        newUrl.searchParams.get(
+          "slug"
+        );
 
       newUrl.searchParams.set(
         "slug",
-        addTrueSuffix(current)
+        addTrueSuffix(
+          current
+        )
       );
     }
 
@@ -651,35 +801,34 @@ function buildTrueUrl(url, info) {
 
   /*
    * PRODUCT / SELLER PATH
-   *
-   * /product/abc
-   * →
-   * /product/abc-true
-   *
-   * /seller/abc
-   * →
-   * /seller/abc-true
    */
 
-  if (info.source === "path") {
+  if (
+    info.source === "path"
+  ) {
     const pathParts =
       newUrl.pathname
         .split("/")
         .filter(Boolean);
 
-    if (pathParts.length > 0) {
+    if (
+      pathParts.length > 0
+    ) {
       const lastIndex =
         pathParts.length - 1;
 
       pathParts[lastIndex] =
         addTrueSuffix(
           safeDecode(
-            pathParts[lastIndex]
+            pathParts[
+              lastIndex
+            ]
           )
         );
 
       newUrl.pathname =
-        "/" + pathParts.join("/");
+        "/" +
+        pathParts.join("/");
     }
 
     return newUrl;
@@ -691,14 +840,20 @@ function buildTrueUrl(url, info) {
 
   if (
     info.source === "sellerId" &&
-    newUrl.searchParams.has("sellerId")
+    newUrl.searchParams.has(
+      "sellerId"
+    )
   ) {
     const current =
-      newUrl.searchParams.get("sellerId");
+      newUrl.searchParams.get(
+        "sellerId"
+      );
 
     newUrl.searchParams.set(
       "sellerId",
-      addTrueSuffix(current)
+      addTrueSuffix(
+        current
+      )
     );
 
     return newUrl;
@@ -712,17 +867,25 @@ function buildTrueUrl(url, info) {
     info.source === "username"
   ) {
     if (
-      newUrl.searchParams.has("username")
+      newUrl.searchParams.has(
+        "username"
+      )
     ) {
       const current =
-        newUrl.searchParams.get("username");
+        newUrl.searchParams.get(
+          "username"
+        );
 
       newUrl.searchParams.set(
         "username",
-        addTrueSuffix(current)
+        addTrueSuffix(
+          current
+        )
       );
     } else if (
-      newUrl.searchParams.has("sellerUsername")
+      newUrl.searchParams.has(
+        "sellerUsername"
+      )
     ) {
       const current =
         newUrl.searchParams.get(
@@ -731,7 +894,9 @@ function buildTrueUrl(url, info) {
 
       newUrl.searchParams.set(
         "sellerUsername",
-        addTrueSuffix(current)
+        addTrueSuffix(
+          current
+        )
       );
     }
 
@@ -740,14 +905,6 @@ function buildTrueUrl(url, info) {
 
   /*
    * Bare query key
-   *
-   * ?tarimmer-vih72aiz
-   * →
-   * ?tarimmer-vih72aiz-true
-   *
-   * ?@womenfashion
-   * →
-   * ?@womenfashion-true
    */
 
   if (
@@ -759,17 +916,34 @@ function buildTrueUrl(url, info) {
 
     const newKey =
       addTrueSuffix(
-        safeDecode(oldKey)
+        safeDecode(
+          oldKey
+        )
       );
 
     const params =
       new URLSearchParams();
 
-    for (const [key, value] of newUrl.searchParams.entries()) {
-      if (key === oldKey && value === "") {
-        params.append(newKey, "");
+    for (
+      const [
+        key,
+        value
+      ]
+      of newUrl.searchParams.entries()
+    ) {
+      if (
+        key === oldKey &&
+        value === ""
+      ) {
+        params.append(
+          newKey,
+          ""
+        );
       } else {
-        params.append(key, value);
+        params.append(
+          key,
+          value
+        );
       }
     }
 
@@ -789,7 +963,9 @@ function buildTrueUrl(url, info) {
  * ================================================================
  */
 
-async function getProductBySlug(slug) {
+async function getProductBySlug(
+  slug
+) {
   try {
     const FIRESTORE_BASE =
       "https://firestore.googleapis.com/v1/projects/ghotimarket/databases/(default)/documents";
@@ -804,37 +980,53 @@ async function getProductBySlug(slug) {
       structuredQuery: {
         from: [
           {
-            collectionId: "products",
+            collectionId:
+              "products",
           },
         ],
+
         where: {
           fieldFilter: {
             field: {
-              fieldPath: "slug",
+              fieldPath:
+                "slug",
             },
+
             op: "EQUAL",
+
             value: {
-              stringValue: slug,
+              stringValue:
+                slug,
             },
           },
         },
+
         limit: 1,
       },
     };
 
-    const response = await fetch(
-      queryUrl,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify(body),
-      }
-    );
+    const response =
+      await fetch(
+        queryUrl,
+        {
+          method:
+            "POST",
 
-    if (!response.ok) {
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            JSON.stringify(
+              body
+            ),
+        }
+      );
+
+    if (
+      !response.ok
+    ) {
       return null;
     }
 
@@ -856,7 +1048,9 @@ async function getProductBySlug(slug) {
 
     return {
       name:
-        getString(fields.name) ||
+        getString(
+          fields.name
+        ) ||
         "GHOTI MARKET Product",
 
       description:
@@ -866,14 +1060,20 @@ async function getProductBySlug(slug) {
         "GHOTI MARKET থেকে সেরা দামে পণ্য কিনুন।",
 
       slug:
-        getString(fields.slug) ||
+        getString(
+          fields.slug
+        ) ||
         slug,
 
       price:
-        getNumber(fields.price),
+        getNumber(
+          fields.price
+        ),
 
       oldPrice:
-        getNumber(fields.oldPrice),
+        getNumber(
+          fields.oldPrice
+        ),
 
       image:
         getFirstArrayString(
@@ -908,29 +1108,23 @@ async function getProductBySlug(slug) {
  * ================================================================
  * SELLER FIRESTORE
  * ================================================================
- *
- * sellerId:
- *     users/{sellerId}
- *
- * username:
- *     users collection
- *     where username == identifier
- *
- * ================================================================
  */
 
-async function getSeller(identifier, source = null) {
+async function getSeller(
+  identifier,
+  source = null
+) {
   try {
     const FIRESTORE_BASE =
       "https://firestore.googleapis.com/v1/projects/ghotimarket/databases/(default)/documents";
 
     /*
-     * ------------------------------------------------------------
-     * 1. sellerId হলে সরাসরি users/{sellerId}
-     * ------------------------------------------------------------
+     * sellerId
      */
 
-    if (source === "sellerId") {
+    if (
+      source === "sellerId"
+    ) {
       const response =
         await fetch(
           `${FIRESTORE_BASE}/users/${encodeURIComponent(
@@ -941,7 +1135,9 @@ async function getSeller(identifier, source = null) {
       const data =
         await response.json();
 
-      if (data?.fields) {
+      if (
+        data?.fields
+      ) {
         return normalizeSeller(
           data.fields,
           identifier
@@ -952,9 +1148,7 @@ async function getSeller(identifier, source = null) {
     }
 
     /*
-     * ------------------------------------------------------------
-     * 2. username হলে users collection-এর username field
-     * ------------------------------------------------------------
+     * username
      */
 
     if (
@@ -967,9 +1161,7 @@ async function getSeller(identifier, source = null) {
     }
 
     /*
-     * ------------------------------------------------------------
-     * 3. PATH / fallback
-     * ------------------------------------------------------------
+     * PATH / fallback
      */
 
     let response =
@@ -982,7 +1174,9 @@ async function getSeller(identifier, source = null) {
     let data =
       await response.json();
 
-    if (data?.fields) {
+    if (
+      data?.fields
+    ) {
       return normalizeSeller(
         data.fields,
         identifier
@@ -1003,7 +1197,9 @@ async function getSeller(identifier, source = null) {
     data =
       await response.json();
 
-    if (data?.fields) {
+    if (
+      data?.fields
+    ) {
       return normalizeSeller(
         data.fields,
         identifier
@@ -1051,20 +1247,23 @@ async function getSellerByUsername(
       structuredQuery: {
         from: [
           {
-            collectionId: "users",
+            collectionId:
+              "users",
           },
         ],
 
         where: {
           fieldFilter: {
             field: {
-              fieldPath: "username",
+              fieldPath:
+                "username",
             },
 
             op: "EQUAL",
 
             value: {
-              stringValue: username,
+              stringValue:
+                username,
             },
           },
         },
@@ -1077,18 +1276,24 @@ async function getSellerByUsername(
       await fetch(
         queryUrl,
         {
-          method: "POST",
+          method:
+            "POST",
 
           headers: {
             "Content-Type":
               "application/json",
           },
 
-          body: JSON.stringify(body),
+          body:
+            JSON.stringify(
+              body
+            ),
         }
       );
 
-    if (!response.ok) {
+    if (
+      !response.ok
+    ) {
       return null;
     }
 
@@ -1214,14 +1419,6 @@ function buildProductHTML(
     product.image ||
     "https://i.ibb.co/RG2hrf3y/background-remove-ghoti-market.png";
 
-  /*
-   * Current request-এর exact host ব্যবহার হবে।
-   *
-   * www.ghotimarket.com
-   * অথবা
-   * ghotimarket.com
-   */
-
   const canonical =
     url.toString();
 
@@ -1234,25 +1431,39 @@ function buildProductHTML(
 <meta name="viewport"
 content="width=device-width, initial-scale=1.0">
 
-<title>${escapeHTML(title)}</title>
+<title>${escapeHTML(
+    title
+  )}</title>
 
 <meta name="description"
-content="${escapeAttr(description)}">
+content="${escapeAttr(
+    description
+  )}">
 
 <link rel="canonical"
-href="${escapeAttr(canonical)}">
+href="${escapeAttr(
+    canonical
+  )}">
 
 <meta property="og:title"
-content="${escapeAttr(title)}">
+content="${escapeAttr(
+    title
+  )}">
 
 <meta property="og:description"
-content="${escapeAttr(description)}">
+content="${escapeAttr(
+    description
+  )}">
 
 <meta property="og:image"
-content="${escapeAttr(image)}">
+content="${escapeAttr(
+    image
+  )}">
 
 <meta property="og:url"
-content="${escapeAttr(canonical)}">
+content="${escapeAttr(
+    canonical
+  )}">
 
 <meta property="og:type"
 content="product">
@@ -1262,8 +1473,10 @@ content="GHOTI MARKET">
 
 <meta property="product:price:amount"
 content="${escapeAttr(
-  String(product.price)
-)}">
+    String(
+      product.price
+    )
+  )}">
 
 <meta property="product:price:currency"
 content="BDT">
@@ -1272,13 +1485,19 @@ content="BDT">
 content="summary_large_image">
 
 <meta name="twitter:title"
-content="${escapeAttr(title)}">
+content="${escapeAttr(
+    title
+  )}">
 
 <meta name="twitter:description"
-content="${escapeAttr(description)}">
+content="${escapeAttr(
+    description
+  )}">
 
 <meta name="twitter:image"
-content="${escapeAttr(image)}">
+content="${escapeAttr(
+    image
+  )}">
 
 </head>
 
@@ -1293,8 +1512,12 @@ content="${escapeAttr(image)}">
   )}</p>
 
 <img
-src="${escapeAttr(image)}"
-alt="${escapeAttr(product.name)}"
+src="${escapeAttr(
+    image
+  )}"
+alt="${escapeAttr(
+    product.name
+  )}"
 width="1200"
 height="630">
 
@@ -1341,25 +1564,39 @@ function buildSellerHTML(
 <meta name="viewport"
 content="width=device-width, initial-scale=1.0">
 
-<title>${escapeHTML(title)}</title>
+<title>${escapeHTML(
+    title
+  )}</title>
 
 <meta name="description"
-content="${escapeAttr(description)}">
+content="${escapeAttr(
+    description
+  )}">
 
 <link rel="canonical"
-href="${escapeAttr(canonical)}">
+href="${escapeAttr(
+    canonical
+  )}">
 
 <meta property="og:title"
-content="${escapeAttr(title)}">
+content="${escapeAttr(
+    title
+  )}">
 
 <meta property="og:description"
-content="${escapeAttr(description)}">
+content="${escapeAttr(
+    description
+  )}">
 
 <meta property="og:image"
-content="${escapeAttr(image)}">
+content="${escapeAttr(
+    image
+  )}">
 
 <meta property="og:url"
-content="${escapeAttr(canonical)}">
+content="${escapeAttr(
+    canonical
+  )}">
 
 <meta property="og:type"
 content="profile">
@@ -1371,13 +1608,19 @@ content="GHOTI MARKET">
 content="summary_large_image">
 
 <meta name="twitter:title"
-content="${escapeAttr(title)}">
+content="${escapeAttr(
+    title
+  )}">
 
 <meta name="twitter:description"
-content="${escapeAttr(description)}">
+content="${escapeAttr(
+    description
+  )}">
 
 <meta name="twitter:image"
-content="${escapeAttr(image)}">
+content="${escapeAttr(
+    image
+  )}">
 
 </head>
 
@@ -1392,8 +1635,12 @@ content="${escapeAttr(image)}">
   )}</p>
 
 <img
-src="${escapeAttr(image)}"
-alt="${escapeAttr(seller.name)}"
+src="${escapeAttr(
+    image
+  )}"
+alt="${escapeAttr(
+    seller.name
+  )}"
 width="1200"
 height="630">
 
@@ -1408,29 +1655,48 @@ height="630">
  * ================================================================
  */
 
-function hasTrueSuffix(value) {
+function hasTrueSuffix(
+  value
+) {
   return /-true$/i.test(
-    String(value ?? "").trim()
+    String(
+      value ?? ""
+    ).trim()
   );
 }
 
 
-function removeTrueSuffix(value) {
-  return String(value ?? "")
+function removeTrueSuffix(
+  value
+) {
+  return String(
+    value ?? ""
+  )
     .trim()
-    .replace(/-true$/i, "");
+    .replace(
+      /-true$/i,
+      ""
+    );
 }
 
 
-function addTrueSuffix(value) {
+function addTrueSuffix(
+  value
+) {
   const clean =
-    String(value ?? "").trim();
+    String(
+      value ?? ""
+    ).trim();
 
   if (!clean) {
     return clean;
   }
 
-  if (hasTrueSuffix(clean)) {
+  if (
+    hasTrueSuffix(
+      clean
+    )
+  ) {
     return clean;
   }
 
@@ -1444,12 +1710,19 @@ function addTrueSuffix(value) {
  * ================================================================
  */
 
-function getString(field) {
-  return field?.stringValue ?? "";
+function getString(
+  field
+) {
+  return (
+    field?.stringValue ??
+    ""
+  );
 }
 
 
-function getNumber(field) {
+function getNumber(
+  field
+) {
   return (
     field?.integerValue ??
     field?.doubleValue ??
@@ -1469,7 +1742,9 @@ function getBoolean(
 }
 
 
-function getFirstArrayString(field) {
+function getFirstArrayString(
+  field
+) {
   if (
     !field?.arrayValue?.values
   ) {
@@ -1477,9 +1752,12 @@ function getFirstArrayString(field) {
   }
 
   for (
-    const item of field.arrayValue.values
+    const item
+    of field.arrayValue.values
   ) {
-    if (item?.stringValue) {
+    if (
+      item?.stringValue
+    ) {
       return item.stringValue;
     }
   }
@@ -1488,8 +1766,12 @@ function getFirstArrayString(field) {
 }
 
 
-function escapeHTML(value) {
-  return String(value ?? "")
+function escapeHTML(
+  value
+) {
+  return String(
+    value ?? ""
+  )
     .replace(
       /&/g,
       "&amp;"
@@ -1513,13 +1795,21 @@ function escapeHTML(value) {
 }
 
 
-function escapeAttr(value) {
-  return escapeHTML(value);
+function escapeAttr(
+  value
+) {
+  return escapeHTML(
+    value
+  );
 }
 
 
-function stripHTML(value) {
-  return String(value ?? "")
+function stripHTML(
+  value
+) {
+  return String(
+    value ?? ""
+  )
     .replace(
       /<[^>]*>/g,
       ""
@@ -1537,10 +1827,13 @@ function truncate(
   maxLength
 ) {
   const text =
-    String(value ?? "").trim();
+    String(
+      value ?? ""
+    ).trim();
 
   if (
-    text.length <= maxLength
+    text.length <=
+    maxLength
   ) {
     return text;
   }
@@ -1549,12 +1842,15 @@ function truncate(
     text.substring(
       0,
       maxLength - 3
-    ) + "..."
+    ) +
+    "..."
   );
 }
 
 
-function safeDecode(value) {
+function safeDecode(
+  value
+) {
   try {
     return decodeURIComponent(
       value
@@ -1565,16 +1861,25 @@ function safeDecode(value) {
 }
 
 
-function cleanIdentifier(value) {
+function cleanIdentifier(
+  value
+) {
   return safeDecode(
-    String(value ?? "")
+    String(
+      value ?? ""
+    )
   )
     .trim()
-    .replace(/^@+/, "");
+    .replace(
+      /^@+/,
+      ""
+    );
 }
 
 
-function formatPrice(value) {
+function formatPrice(
+  value
+) {
   if (
     value === "" ||
     value === null ||
@@ -1587,9 +1892,13 @@ function formatPrice(value) {
     Number(value);
 
   if (
-    !Number.isFinite(number)
+    !Number.isFinite(
+      number
+    )
   ) {
-    return String(value);
+    return String(
+      value
+    );
   }
 
   return number.toLocaleString(
